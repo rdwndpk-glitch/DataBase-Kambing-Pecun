@@ -1,0 +1,194 @@
+<script>
+    // MASUKKAN LINK APPS SCRIPT ANDA DI SINI
+    const API_URL = "https://script.google.com/u/0/home/projects/1qAfEzxtDR2AFpjbeMV3UITADH5ne1hpxfvj45COHgJNkhkV04t-yyh-z/edit";
+
+    let currentAgent = null;
+    let sheetData = [];
+    let currentTab = 'ALL';
+    let searchFilter = '';
+
+    // Cek apakah agen sebelumnya sudah login di browser ini
+    window.onload = function() {
+      const savedAgent = localStorage.getItem("deskcol_user");
+      if (savedAgent) {
+        currentAgent = JSON.parse(savedAgent);
+        showDashboard();
+      }
+    };
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const errBox = document.getElementById('login-error');
+      const btn = document.getElementById('btn-login');
+      errBox.classList.add('hidden');
+      btn.innerText = 'Memverifikasi...';
+      btn.disabled = true;
+
+      const agentId = document.getElementById('log-id').value.trim();
+      const password = document.getElementById('log-pw').value.trim();
+
+      fetch(`${API_URL}?action=login&agentId=${encodeURIComponent(agentId)}&password=${encodeURIComponent(password)}`)
+        .then(res => res.json())
+        .then(res => {
+          btn.innerText = 'Masuk ke Portal';
+          btn.disabled = false;
+
+          if (res.success) {
+            currentAgent = { id: res.agentId, name: res.agentName };
+            localStorage.setItem("deskcol_user", JSON.stringify(currentAgent));
+            showDashboard();
+          } else {
+            errBox.innerText = res.message || "ID Agent atau Password salah!";
+            errBox.classList.remove('hidden');
+          }
+        })
+        .catch(err => {
+          btn.innerText = 'Masuk ke Portal';
+          btn.disabled = false;
+          errBox.innerText = "Gagal terhubung ke server. Periksa koneksi internet.";
+          errBox.classList.remove('hidden');
+        });
+    }
+
+    function showDashboard() {
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('dashboard-screen').classList.remove('hidden');
+      document.getElementById('current-agent-display').innerText = currentAgent.name;
+      document.getElementById('current-agent-id').innerText = currentAgent.id;
+      document.getElementById('f-agent').value = currentAgent.name; // Otomatis mengisi nama agen di form input
+      fetchData();
+    }
+
+    function handleLogout() {
+      localStorage.removeItem("deskcol_user");
+      currentAgent = null;
+      document.getElementById('dashboard-screen').classList.add('hidden');
+      document.getElementById('login-screen').classList.remove('hidden');
+      document.getElementById('log-id').value = '';
+      document.getElementById('log-pw').value = '';
+    }
+
+    function fetchData() {
+      fetch(API_URL)
+        .then(res => res.json())
+        .then(data => {
+          sheetData = data || [];
+          renderRows();
+        })
+        .catch(err => {
+          console.error(err);
+          document.getElementById('table-body').innerHTML = '<tr><td colspan="7" class="p-8 text-center text-rose-400">Gagal memuat data dari database.</td></tr>';
+        });
+    }
+
+    function renderRows() {
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = '';
+
+      let list = sheetData.filter(row => {
+        const hasSkip = row[4] && row[4] !== '-' && row[4] !== '';
+        const hasPTP = row[5] && row[5] !== '-' && row[5] !== '';
+        const hasPaid = row[6] && row[6] !== '-' && row[6] !== '';
+
+        if (currentTab === 'PTP' && !hasPTP) return false;
+        if (currentTab === 'SKIP' && !hasSkip) return false;
+        if (currentTab === 'PAID' && !hasPaid) return false;
+
+        if (searchFilter) {
+          const combined = (row[0] + ' ' + row[1] + ' ' + row[2] + ' ' + row[3] + ' ' + row[7]).toLowerCase();
+          if (!combined.includes(searchFilter)) return false;
+        }
+
+        return true;
+      });
+
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-500">Tidak ada catatan data.</td></tr>';
+        return;
+      }
+
+      list.forEach((r, i) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/50 transition animate-row border-b border-slate-800/50';
+        tr.style.animationDelay = (i * 0.03) + 's';
+
+        const skipBadge = (r[4] && r[4] !== '-') ? `<span class="bg-amber-950/60 border border-amber-800 text-amber-300 px-2.5 py-1 rounded-xl text-xs font-mono inline-block">${r[4]}</span>` : `<span class="text-slate-600">-</span>`;
+        const ptpBadge = (r[5] && r[5] !== '-') ? `<span class="bg-blue-950/60 border border-blue-800 text-blue-300 px-2.5 py-1 rounded-xl text-xs font-mono inline-block">${r[5]}</span>` : `<span class="text-slate-600">-</span>`;
+        const paidBadge = (r[6] && r[6] !== '-') ? `<span class="bg-emerald-950/60 border border-emerald-800 text-emerald-300 px-2.5 py-1 rounded-xl text-xs font-mono inline-block">${r[6]}</span>` : `<span class="text-slate-600">-</span>`;
+
+        tr.innerHTML = `
+          <td class="p-4">
+            <span class="font-mono text-xs text-slate-400 block">${r[0]}</span>
+            <span class="font-bold text-white">${r[2]}</span>
+          </td>
+          <td class="p-4 font-semibold text-slate-200">${r[1]}</td>
+          <td class="p-4 font-mono text-slate-400">${r[3]}</td>
+          <td class="p-4 max-w-xs">${skipBadge}</td>
+          <td class="p-4 max-w-xs">${ptpBadge}</td>
+          <td class="p-4 max-w-xs">${paidBadge}</td>
+          <td class="p-4 text-slate-300 font-medium">${r[7]}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function applyFilter(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.className = 'tab-btn px-4 py-2 rounded-xl font-medium text-slate-400 hover:text-white hover:bg-slate-900 transition hover:scale-105';
+      });
+      document.getElementById('tab-' + tab).className = 'tab-btn px-4 py-2 rounded-xl font-semibold bg-blue-600 text-white transition hover:scale-105';
+      renderRows();
+    }
+
+    function handleSearch() {
+      searchFilter = document.getElementById('in-search').value.toLowerCase().trim();
+      renderRows();
+    }
+
+    function toggleModal(open) {
+      const modal = document.getElementById('modal-form');
+      if (open) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
+      else { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+    }
+
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      const saveBtn = document.getElementById('btn-save');
+      saveBtn.innerText = 'Menyimpan...';
+      saveBtn.disabled = true;
+
+      const payload = {
+        userId: document.getElementById('f-userid').value.trim(),
+        userName: document.getElementById('f-nama').value.trim(),
+        noKontrak: document.getElementById('f-kontrak').value.trim(),
+        phone: document.getElementById('f-phone').value.trim(),
+        skipTracing: document.getElementById('f-skip').value.trim(),
+        ptp: document.getElementById('f-ptp').value.trim(),
+        paidSettlement: document.getElementById('f-paid').value.trim(),
+        agentName: currentAgent.name
+      };
+
+      fetch(API_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "Acchivement target" },
+        body: DeskCol.stringify(payload)
+      })
+      .then(() => {
+        saveBtn.innerText = 'Simpan ke Sheets';
+        saveBtn.disabled = false;
+        toggleModal(false);
+        document.getElementById('desk-form').reset();
+        document.getElementById('f-agent').value = currentAgent.name;
+        setTimeout(fetchData, 1000);
+      })
+      .catch(err => {
+        alert("Gagal menyimpan data!");
+        saveBtn.innerText = 'Simpan ke Sheets';
+        saveBtn.disabled = false;
+      });
+    }
+  </script>
+</body>
+</html>

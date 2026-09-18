@@ -169,8 +169,8 @@
   </div>
 
   <script>
-    // MASUKKAN LINK GOOGLE APPS SCRIPT ANDA YANG BERAKHIRAN /exec DI SINI
-    const API_URL = "https://script.google.com/macros/s/AKfycbz16mWWFp48CSEAVtu8OjCIxEBrY--tVP1bz11Q2gs0skcgy3NiwHOphLk4HQ60VLl4/exec";
+    // URL Web App Apps Script aktif
+    const API_URL = "https://script.google.com/macros/s/AKfycbxDLagYJMbiXUIHOm8njNVRbT0tKk46VBHn-syHdzU4TRWBYTzwhPsSrhxjiBoqkVEF/exec";
 
     let currentAgent = null;
     let sheetData = [];
@@ -214,7 +214,7 @@
         .catch(err => {
           btn.innerText = 'Masuk ke Portal';
           btn.disabled = false;
-          errBox.innerText = "Gagal terhubung ke database. Pastikan link API berakhiran /exec dan aksesnya Anyone.";
+          errBox.innerText = "Gagal terhubung ke database. Pastikan koneksi aman dan deploy sudah diset Anyone.";
           errBox.classList.remove('hidden');
         });
     }
